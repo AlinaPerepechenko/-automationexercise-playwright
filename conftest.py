@@ -68,10 +68,10 @@ def _block_ads(page):
 def _increase_default_timeouts(page):
     """The public demo site occasionally responds slowly under load — give
     navigations/actions more room before failing, on top of the 1 automatic
-    rerun configured in pytest.ini for genuinely flaky network hiccups."""
-    page.set_default_timeout(20000)
+    rerun configured in pytest.ini for genuinely flaky network hiccups.
+    WebKit specifically tends to need more headroom than Chromium/Firefox."""
+    page.set_default_timeout(30000)
     page.set_default_navigation_timeout(60000)
-
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
