@@ -1,0 +1,117 @@
+name: UI Tests - AutomationExercise
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * *"   # daily regression at 06:00 UTC
+
+permissions:
+  contents: write   # needed to push the Allure report to gh-pages
+
+jobs:
+  test:
+    name: Run tests (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Run tests in parallel on ${{ matrix.browser }}
+        run: |
+          pytest -n auto --browser ${{ matrix.browser }} \
+                 --alluredir=allure-results-${{ matrix.browser }} || true
+        # `|| true`: a failing test must not stop the report/notify steps below;
+        # the Slack message and Allure report themselves surface the failures.
+        # (--reruns 1 is already applied via pytest.ini's addopts.)
+
+      - name: Upload raw Allure results (${{ matrix.browser }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-${{ matrix.browser }}
+          path: allure-results-${{ matrix.browser }}
+          retention-days: 14
+
+  report_and_notify:
+    name: Build Allure report, deploy to Pages, notify Slack
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Allure commandline + notifier deps
+        run: |
+          sudo apt-get update && sudo apt-get install -y default-jre-headless
+          curl -o allure.tgz -Ls https://github.com/allure-framework/allure2/releases/download/2.29.0/allure-2.29.0.tgz
+          tar -zxf allure.tgz
+          echo "$PWD/allure-2.29.0/bin" >> "$GITHUB_PATH"
+          pip install requests
+
+      - name: Download all browsers' Allure results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: allure-results-*
+          path: merged-results
+          merge-multiple: false
+
+      - name: Merge results into a single folder
+        run: |
+          mkdir -p allure-results
+          find merged-results -mindepth 2 -type f -exec cp {} allure-results/ \;
+
+      - name: Fetch previous report's history (for trend graphs)
+        continue-on-error: true
+        run: |
+          git fetch origin gh-pages --depth=1 || true
+          git checkout origin/gh-pages -- history || true
+          if [ -d history ]; then mv history allure-results/history; fi
+
+      - name: Generate Allure HTML report
+        run: allure generate allure-results -o allure-report --clean
+
+      - name: Deploy report to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: allure-report
+          keep_files: false
+
+      - name: Compute report URL
+        id: pages
+        run: |
+          repo="${GITHUB_REPOSITORY#*/}"
+          owner="${GITHUB_REPOSITORY_OWNER}"
+          echo "url=https://${owner}.github.io/${repo}/" >> "$GITHUB_OUTPUT"
+
+      - name: Notify Slack
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          python utils/slack_notifier.py \
+            --summary allure-report/widgets/summary.json \
+            --report-url "${{ steps.pages.outputs.url }}" \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --branch "${{ github.ref_name }}" \
+            --commit "${{ github.sha }}"
