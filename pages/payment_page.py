@@ -21,14 +21,17 @@ class PaymentPage(BasePage):
         expect(self.page.locator("h2", has_text="Order Placed!")).to_be_visible()
         expect(self.page.get_by_text("Congratulations! Your order has been confirmed!")).to_be_visible()
 
-    def download_invoice(self):
-        # WebKit on Linux (used by GitHub Actions CI) fires the 'download'
-        # event noticeably later than Chromium/Firefox — the global 20s
-        # default timeout isn't enough there, so this one wait gets more room.
-        with self.page.expect_download(timeout=45000) as download_info:
+        def download_invoice(self):
+        # Different browser engines handle this link differently: Chromium/
+        # Firefox trigger a native "download" event, but WebKit renders the
+        # response instead of downloading it, so that event never fires there.
+        # Checking the actual network response is equivalent and browser-agnostic.
+        with self.page.expect_response(lambda r: "/download_invoice/" in r.url) as response_info:
             self.page.locator("a", has_text="Download Invoice").click()
-        download = download_info.value
-        return download
+        response = response_info.value
+        assert response.ok, f"Download Invoice request failed with status {response.status}"
+        assert len(response.body()) > 0, "Downloaded invoice response body is empty"
+        return response
 
     def click_continue(self):
         self.page.locator("[data-qa='continue-button']").click()

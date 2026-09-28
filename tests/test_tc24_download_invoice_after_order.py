@@ -72,10 +72,9 @@ def test_tc24_download_invoice_after_order(
         payment_page.expect_order_placed_successfully()
 
     with allure.step("Click 'Download Invoice' button and verify invoice is downloaded successfully"):
-        download = payment_page.download_invoice()
-        assert download.suggested_filename.endswith((".txt", ".pdf")) or download.suggested_filename
-        allure.attach.file(
-            download.path(), name=download.suggested_filename,
+        response = payment_page.download_invoice()
+        allure.attach(
+            response.body(), name="invoice_response",
             attachment_type=allure.attachment_type.TEXT,
         )
 
