@@ -68,17 +68,12 @@ jobs:
           echo "$PWD/allure-2.29.0/bin" >> "$GITHUB_PATH"
           pip install requests
 
-      - name: Download all browsers' Allure results
+      - name: Download and merge all browsers' Allure results
         uses: actions/download-artifact@v4
         with:
           pattern: allure-results-*
-          path: merged-results
-          merge-multiple: false
-
-      - name: Merge results into a single folder
-        run: |
-          mkdir -p allure-results
-          find merged-results -mindepth 2 -type f -exec cp {} allure-results/ \;
+          path: allure-results
+          merge-multiple: true
 
       - name: Fetch previous report's history (for trend graphs)
         continue-on-error: true
