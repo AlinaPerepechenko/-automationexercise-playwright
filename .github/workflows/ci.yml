@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: write   # needed to push the Allure report to gh-pages
+  actions: read     # needed for download-artifact to list/fetch artifacts across jobs
 
 jobs:
   test:
