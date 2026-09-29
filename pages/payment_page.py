@@ -15,17 +15,10 @@ class PaymentPage(BasePage):
         self.page.locator("[data-qa='pay-button']").click()
 
     def expect_order_placed_successfully(self):
-        # Real confirmation is a plain heading + paragraph, NOT `.alert-success`
-        # (that class is reused by the footer's subscribe box, present on
-        # every page — matching it there was the actual bug).
         expect(self.page.locator("h2", has_text="Order Placed!")).to_be_visible()
         expect(self.page.get_by_text("Congratulations! Your order has been confirmed!")).to_be_visible()
 
-        def download_invoice(self):
-        # Different browser engines handle this link differently: Chromium/
-        # Firefox trigger a native "download" event, but WebKit renders the
-        # response instead of downloading it, so that event never fires there.
-        # Checking the actual network response is equivalent and browser-agnostic.
+    def download_invoice(self):
         with self.page.expect_response(lambda r: "/download_invoice/" in r.url) as response_info:
             self.page.locator("a", has_text="Download Invoice").click()
         response = response_info.value
