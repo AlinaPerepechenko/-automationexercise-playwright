@@ -19,9 +19,16 @@ class PaymentPage(BasePage):
         expect(self.page.get_by_text("Congratulations! Your order has been confirmed!")).to_be_visible()
 
     def download_invoice(self):
-        with self.page.expect_response(lambda r: "/download_invoice/" in r.url) as response_info:
-            self.page.locator("a", has_text="Download Invoice").click()
-        response = response_info.value
+        # Different engines handle this link inconsistently (native download vs
+        # in-page navigation — sometimes invalidating the response body before
+        # it can be read, sometimes navigating the page away entirely). A direct
+        # API request using the same browser session/cookies verifies the file
+        # is served correctly without disturbing the current page or depending
+        # on browser-specific download semantics.
+        link = self.page.locator("a", has_text="Download Invoice")
+        href = link.get_attribute("href")
+        invoice_url = href if href.startswith("http") else f"{self.URL}{href}"
+        response = self.page.request.get(invoice_url)
         assert response.ok, f"Download Invoice request failed with status {response.status}"
         assert len(response.body()) > 0, "Downloaded invoice response body is empty"
         return response
