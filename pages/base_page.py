@@ -42,11 +42,15 @@ class BasePage:
 
     def scroll_to_bottom(self):
         self.page.keyboard.press("End")
-        self.page.wait_for_timeout(300)
+        # Wait for the real condition (we are at the bottom), not a guessed delay.
+        self.page.wait_for_function(
+            "window.scrollY + window.innerHeight >= document.body.scrollHeight - 5",
+            timeout=10000,
+        )
 
     def scroll_to_top_manually(self):
         self.page.evaluate("window.scrollTo(0, 0)")
-        self.page.wait_for_timeout(300)
+        self.page.wait_for_function("window.scrollY === 0", timeout=10000)
 
     def click_scroll_up_arrow(self):
         self.page.locator("#scrollUp").click()

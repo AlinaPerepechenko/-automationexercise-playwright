@@ -129,12 +129,22 @@ workflow creates/updates it automatically on first run).
 
 ---
 
-## 5. What you still need to do yourself
+## 5. One-time setup after cloning
 
-This repo gives you the framework, tests, CI pipeline and Slack integration.
-Three parts of the original assignment are things only you can do, since they
-require your own accounts/identity:
-- **Add your mentor to the Slack channel** that receives the webhook notifications.
-- **Record the 5-minute screen-share walkthrough** of the framework.
-- **Push this to your own GitHub repo**, add the `SLACK_WEBHOOK_URL` secret, and
-  enable Pages — then the pipeline will run for real (it can't run inside this chat).
+1. Create a Slack Incoming Webhook for the channel that should receive results and
+   add it as the repository secret `SLACK_WEBHOOK_URL`
+   (Settings -> Secrets and variables -> Actions).
+2. After the first successful pipeline run, enable GitHub Pages:
+   Settings -> Pages -> Deploy from a branch -> `gh-pages` / `(root)`.
+
+## 6. Notes on stability
+
+The site under test is a shared public demo site and sometimes shows a
+"heavy load (queue full)" page. To keep real failures visible but reduce noise:
+- `pytest-rerunfailures` re-runs a failed test (whole test, fresh browser context)
+  up to 2 times with a short delay (`pytest.ini`). Allure marks retried tests with
+  a retry icon, so flakiness is never hidden.
+- Third-party ad domains are blocked in `conftest.py` (ads can overlay elements
+  and intercept clicks).
+- For local multi-browser runs prefer a small worker count (e.g. `-n 3`) instead
+  of `-n auto`, to avoid overloading the public site.

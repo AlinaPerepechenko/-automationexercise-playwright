@@ -11,7 +11,7 @@ on:
 
 permissions:
   contents: write   # needed to push the Allure report to gh-pages
-  actions: read     # needed for download-artifact to list/fetch artifacts across jobs
+  actions: read     # needed so download-artifact can list/fetch artifacts across jobs
 
 jobs:
   test:
@@ -37,12 +37,14 @@ jobs:
       - name: Run tests in parallel on ${{ matrix.browser }}
         run: |
           pytest -n auto --browser ${{ matrix.browser }} \
-                 --alluredir=allure-results-${{ matrix.browser }} || true
-        # `|| true`: a failing test must not stop the report/notify steps below;
-        # the Slack message and Allure report themselves surface the failures.
-        # (--reruns 1 is already applied via pytest.ini's addopts.)
+                 --alluredir=allure-results-${{ matrix.browser }}
+        # No `|| true`: a real test failure must show up as a real failure in
+        # GitHub's UI (commit status / PR checks). The report + Slack jobs below
+        # still run because they use `if: always()`.
+        # (--reruns 2 is already applied via pytest.ini's addopts.)
 
       - name: Upload raw Allure results (${{ matrix.browser }})
+        if: always()   # upload results even when tests failed, so the report is built
         uses: actions/upload-artifact@v4
         with:
           name: allure-results-${{ matrix.browser }}
@@ -79,6 +81,7 @@ jobs:
       - name: Fetch previous report's history (for trend graphs)
         continue-on-error: true
         run: |
+          mkdir -p allure-results
           git fetch origin gh-pages --depth=1 || true
           git checkout origin/gh-pages -- history || true
           if [ -d history ]; then mv history allure-results/history; fi
